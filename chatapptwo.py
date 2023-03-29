@@ -17,16 +17,25 @@ def server(port):
     print("\n. . .creating socket server. . .")
     soct = socket(AF_INET, SOCK_DGRAM)
     bundle = ("localhost", port)
-    soct.bind(("localhost",port))
+    host = gethostbyname(gethostname())
+    print("server IP: ", host)
+    """try:
+        soct.bind(('',port))
+    except soct.error as e:
+        print(str(e)) """
     server_list = {}
+    soct.connect((host, port))
     print("---Server successfully created---")
-
-    print("\n. . .starting the wait to hear from server. . .")
+    print("\n. . .starting the wait to hear from client. . .")
     while True:
         buf, paddr = soct.recvfrom(4096)
         print("---received from client---")
         buf = buf.decode()
         lines = buf.splitlines()
+        test_not = 0
+        for i in lines:
+            print("spot #", test_not, " for lines: ", i)
+            test_not += 1
         stat = lines[0]
         if stat == "REGISTER":
             print("---received a REGISTER update---")
@@ -46,9 +55,12 @@ def client(username, server_ip, server_port, client_port):
     u = str(username)
     s = int(server_port)
     c = int(client_port)
-    p = str(server_ip)
-    bundle = (p,c)
-    soct.bind((p, c))
+    #p = str(server_ip)
+    #bundle = (p,c)
+    host = gethostbyname(gethostname())
+    #print("server IP: ", host)
+    soct.bind(('', c))
+    soct.connect((host,s))
     print("--successfully bound the client---")
     
     """
@@ -59,24 +71,21 @@ def client(username, server_ip, server_port, client_port):
     print("tested duplicates")
     """
 
-    print(". . .beginning multithreading for thread registration, duplicate test, \
-          and listening thread. . .")
-    reg_thread = threading.Thread(target=cli_reg, args=(soct, u, p, s, c))
-    print("---registration thread successfully created---")
-    tester = threading.Thread(target=isDup_cli, args=(soct,))
-    print("---duplicate thread successfully created---")
+    print("\n. . .beginning thread registration, duplicate test, and multithreading for listening thread. . .")
+    cli_reg(soct, u, host, s, c)
+    print("---registration return successful---")
+    isDup = isDup_cli(soct)
+    print("---duplicate return successful---")
+    print("\n. . .CREATING MULTITHREAD FOR CLIENT LISTEN. . .")
     listen_thread = threading.Thread(target=clientlisten, args=(soct, local_list))
     print("---listening thread successfully created---")
-    print("\n. . .STARTING THREAD REGISTRATION. . .")
-    reg_thread.start()
-    print("\n. . . STARTING DUPLICATE THREAD. . .")
-    tester.start()
-    isDup = tester.join()
     if isDup:
         print("sorry. Username already taken. Please choose one that is not taken")
         sys.exit(1)
     else:
         print("---no duplicates---")
+        soct.connect((host,c))
+        print("---successfully connected to server---")
     print("\n. . .STARTING THREAD LISTENING. . .")
     listen_thread.start()
 
@@ -106,6 +115,8 @@ def server_reg(soct, paddr, username, ip, cport, server_list):
         if username in server_list:
             isDup = True
             print("---duplicate found within clients---")
+        else:
+            isDup = False
         if isDup:
             dup = "ALREADY EXISTS\nUsername already exists"
             soct.sendto(dup.encode(), (paddr[0], cport))
@@ -130,7 +141,7 @@ def cli_reg(soct, usrn, ip, sp, cp):
 
         bc_addr = (ip, cp)
         bs_addr = (ip, sp)
-        reg = "REGISTER\n{str(usrn)}\n{str(ip)}\n\n{int(cp)}"
+        reg = "REGISTER\n{u}\n{i}\n{c}".format(u = str(usrn), i = str(ip), c = int(cp))
         print("---registration successfully created---")
 
         """
@@ -141,7 +152,6 @@ def cli_reg(soct, usrn, ip, sp, cp):
         """
         print("\n. . .registration ack being sent. . .")
         soct.sendto(reg.encode(), bs_addr)
-        print("---client registration being sent to server---")
     else:
         print("error. incorrect size of port")
         sys.exit(1)
