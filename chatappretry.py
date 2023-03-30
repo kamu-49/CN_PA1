@@ -64,6 +64,11 @@ def multiserver(sock, caddr, cport, recv_list, serv_list):
         else:
             reg = "REGISTER\n{u}\n{i}\n{c}".format(u = username, i = ip, c = cliport)
             sock.sendall(reg.encode())
+    elif status == "REGISTRATION_FINISHED":
+        printer = list[1]
+        print(printer)
+        ready = "ACK\nsend when you're ready"
+        sock.sendall(ready.encode())
     else:
         print("unknown status. Currently working on it.")
 
@@ -79,6 +84,8 @@ def multiclient(sock, port, recv_list):
             ip = lines[2]
             recv_list[username]["IP"] = ip
             recv_list[username]["Status"] = "Online"
+            ack = "REGISTRATION_FINISHED\nClient is finished registration and is ready"
+            sock.sendto(ack.encode(), addr)
         elif status == "DUPLICATE":
             print("hard exiting. need to restart because you have taken a name that already exists")
             sys.exit()
@@ -86,7 +93,11 @@ def multiclient(sock, port, recv_list):
             username = lines[1]
             ip = lines[2]
             cport = lines[3]
-            list_create(recv_list, ip, cport)
+            recv_list = list_create(recv_list, ip, cport)
+            ack = "REGISTRATION_FINISHED\nClient is finished registration and is ready"
+            sock.sendto(ack.encode(), addr)
+        elif status == "ACK":
+            print("this is where I will start texting.")
         else:
             print("unkown status. Currently working on")
 
