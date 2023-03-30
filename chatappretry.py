@@ -15,13 +15,16 @@ def server(port):
         buff, caddr = sock.recvfrom(4096)
         buff = buff.decode()
         list = buff.splitlines()
+        cport = caddr[1]
+        caddr = caddr[0]
         print("client address: ", caddr)
-        print("---successfully received message from client---")
+        print("---successfully received registration from client---")
         status = buff[0]
         #print("\n. . .THREAD ATTEMPT. . .")
-        print("\n. . .MULTITHREAD UTLIIZATION. . .")
-        smt = threading.Thread(target=multiserver, args=(sock, caddr[0], cport, list, server_list))
+        print("\n. . .MULTITHREAD UTILIZATION. . .")
+        smt = threading.Thread(target=multiserver, args=(sock, caddr, cport, sport, list, server_list))
         smt.start()
+        smt.join()
         print("---successfully started multithreading for server---")
 
 def client(username, serverip, serverport, clientport):
@@ -36,45 +39,67 @@ def client(username, serverip, serverport, clientport):
     print("Welcome, %s. Your port number is %d and are attempting to connect to the port %d" % (username, clientport, serverport))
     test = "REGISTRATION\n{u}\n{i}\n{c}".format(u = str(username), i = str(serverip), c = int(clientport))
     sock.sendto(test.encode(), (serverip, serverport))
-    print("---message sent---")
+    print("---registration message sent---")
 
     print("\n.. .MULTITHREAD UTILIZATION FOR CURRENT SERVER. . . ")
-    cmt = threading.Thread(target=multiclient, args=(sock, cport, local_list))
+    cmt = threading.Thread(target=multiclient, args=(sock, int(cport), local_list))
     cmt.start()
 
-def multiserver(sock, caddr, cport, recv_list, serv_list):
-    list = recv_list
-    status = list[0]
+def multiserver(sock, caddr, cport, sport, recv_list, serv_list):
+    print("---successfully entered into the multithread server function----")
+    line = recv_list
+    list = serv_list
+    status = line[0]
+    print("HOW IS THIS WRONG**************************************: ", status)
 
-
+    print("\n. . .Testing Status in multithread function. . .")
     if status == "REGISTRATION":
         print("\n. . .Beginning Registration process on server side. . .")
-        username = list[1]
-        ip = list[2]
-        cliport = list[3]
-        if username in serv_list:
-            if (serv_list[username]["Client Port"] == cliport):
+        username = line[1]
+        ip = line[2]
+        cliport = line[3]
+        if username in list:
+            if (list[username]["Client Port"] == cliport):
+                #assumming the server list is not empty
                 print("===situation of a returning client===")
                 upd = "RETURNER\n{u}\n{i}".format(u=username, i=ip)
-                sock.sendall(upd.encode())
+                for un in list:
+                    combo = (un["IP"], un["Client Port"])
+                    print("*********sending registeration to ", combo)
+                    sock.sendto(upd.decode(), combo)
             else:
+                #assuming the server list is not empty
                 print("===duplicate found===")
                 dup = "DUPLICATE\nA duplicate was found. Need to get rid of client"
                 sock.sendto(dup.encode(), (caddr, cliport))
         else:
+            print("---not found in list, so need to do new registration---")
             reg = "REGISTER\n{u}\n{i}\n{c}".format(u = username, i = ip, c = cliport)
-            sock.sendall(reg.encode())
-    elif status == "REGISTRATION_FINISHED":
-        printer = list[1]
+            send_all_func(sock, reg, list, ip, cliport, sport, True)
+            print("---presumably successfully sent to all clients.---")
+            list = list_create(list, username, ip, cliport)
+    elif status == "REGISTRATION_UPDATED":
+        print("\n. . .updating registration. . .")
+        pp = line[1]
+        printer = line[2]
         print(printer)
         ready = "ACK\nsend when you're ready"
-        sock.sendall(ready.encode())
+        send_all_func(sock, ready, list, pp, cliport, sport, True)
+    elif status == "REGISTRATION_FINISHED":
+        print("\n. . .finishing up registration. . .")
+        pp = line[1]
+        cp = line[2]
+        printer = line[3]
+        print(printer)
+        ready = "ACK\nsend when you're ready"
+        send_all_func(sock, ready, list, pp, cp, sport, True)
     else:
         print("unknown status. Currently working on it.")
 
 def multiclient(sock, port, recv_list):
     while True:
         buff, addr = sock.recvfrom(4096)
+        print("server addres: ", addr)
         buff = buff.decode()
         lines = buff.splitlines()
         status = lines[0]
@@ -84,7 +109,7 @@ def multiclient(sock, port, recv_list):
             ip = lines[2]
             recv_list[username]["IP"] = ip
             recv_list[username]["Status"] = "Online"
-            ack = "REGISTRATION_FINISHED\nClient is finished registration and is ready"
+            ack = "REGISTRATION_UPDATED\nClient updated registration and is ready"
             sock.sendto(ack.encode(), addr)
         elif status == "DUPLICATE":
             print("hard exiting. need to restart because you have taken a name that already exists")
@@ -93,38 +118,39 @@ def multiclient(sock, port, recv_list):
             username = lines[1]
             ip = lines[2]
             cport = lines[3]
-            recv_list = list_create(recv_list, ip, cport)
-            ack = "REGISTRATION_FINISHED\nClient is finished registration and is ready"
+            recv_list = list_create(recv_list, username, ip, cport)
+            ack = "REGISTRATION_FINISHED\n{i}\n{c}\nClient finished registration and is ready".format(i = ip, c = cport)
             sock.sendto(ack.encode(), addr)
         elif status == "ACK":
             print("this is where I will start texting.")
         else:
             print("unkown status. Currently working on")
 
-def server_reg(sock, caddr, name, ip, sport, cport, slist):
-    print("\n. . .beginning client registration. . .")
-    isDup = False
-    if name in slist:
-        print("===duplicate found within clients===")
-        dup = "USER EXISTS\n Username already exists within another client"
-        sock.sendto(dup.encode(), (caddr, cport))
-    else:
-        slist[name] = {}
-        slist[name]["IP"] = ip
-        slist[name]["Client Port"] = cport
-        slist[name]["Status"] = "Online"
-        print("---table successfully updated for server registration---")
-        print("\n. . .creating ACK. . .")
-        ack = "REGISTERED\n{n}\n{i}\n{c}".format(u = str(name), i = str(ip), c = int(cport))
-        sock.sendall(ack.encode())
-
 def list_create(list, name, ip, cport):
     list[name] = {}
-    list[name]["IP"] = ip
-    list[name]["Client Port"] = cport
+    list[name]["IP"] = str(ip)
+    list[name]["Client Port"] = int(cport)
     list[name]["Status"] = "Online"
     print("---table successfully updated---")
     return list
+
+def send_all_func(sock, encoded, list, clip, cport, sport, isServ):
+    print("i still hate this test: ", list)
+    if len(list) > 1:
+        for un in list:
+            print("i hate this test: ", un)
+            combo = (un["IP"], un["Client Port"])
+            print("*********sending registeration to ", combo)
+            sock.sendto(encoded.encode(), combo)
+    else:
+            print("************************* too tired: ", clip, cport)
+            combo = (str(clip), int(cport))
+            print("******sending registration to ", combo)
+            sock.sendto(encoded.encode(), combo)
+            print("---new list---\n     ", list)
+
+    if not isServ:
+        sock.sendto(encoded.encode(), (str(clip), int(sport)))
 
 if __name__ == "__main__":
     mode = sys.argv[1]
