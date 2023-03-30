@@ -1,6 +1,9 @@
 from socket import *
 import threading
 import sys
+import signal
+
+qq = False
 
 def server(port):
     print("@@@Location: server(port)")
@@ -28,6 +31,7 @@ def server(port):
 
 def client(username, serverip, serverport, clientport):
     print("@@@Location: client(username, serverip, serverport, clientport)")
+    quitter = False
     local_list = {}
     sock = socket(AF_INET, SOCK_DGRAM)
     print("- - - - - -client socket created")
@@ -43,6 +47,11 @@ def client(username, serverip, serverport, clientport):
     print("\n. . . . .CLIENT MULTITHREAD UTLIIZATION. . . . . ")
     cmt = threading.Thread(target=multiclient, args=(sock, int(cport), local_list))
     cmt.start()
+    q = cmt.join()
+    if q is True:
+        sq = "SILENT_QUIT\n{u}\n{i}\n{p}\n silent quit commence".format(u = str(username), i = str(serverip), p=int(clientport))
+        sock.sendto(sq.encode(), (serverip, serverport))
+        print("- - - - - -successfull silent quit test")
     print("- - - - - -successfully started multiserver thread")
 
 def multiserver(sock, caddr, cport, sport, recv_list, serv_list):
@@ -89,12 +98,34 @@ def multiserver(sock, caddr, cport, sport, recv_list, serv_list):
         ready = "ACK\nsend when you're ready"
         send_all_func(sock, ready, list, pp, cliport, sport, True, user)
         print("- - - - - -send all func called to send an ACK to all clients")
+    elif status == "SILENT_QUIT":
+        print("! ! !client has quit! ! !")
+        user = line[1]
+        ip = line[2]
+        port = line[3]
+        list[user]["Status"] = "Offline"
+        for u in list:
+            if list[u]["Status"] == "Online":
+                userr = u
+                ipp = list[u]["IP"]
+                portt = list[u]["Client Port"]
+                squit = "SILENT_QUIT_LIST_UPDATE\n{uz}\n{i}\n{p}\nA user has quit".format(uz=userr, i=ipp, p=portt)
+                sock.sendto(squit.encode(), (ipp, portt))
+    elif  status == "QUIT_ACK":
+        ready = "ACK\nsend when you're ready"
+        un = line[1]
+        ii = line[2]
+        ppp = line[3]
+        sock.sendto(ready.encode(), (ii, ppp))
     else:
         print("unknown status. Currently working on it.")
 
 def multiclient(sock, port, recv_list):
     print("@@@Loctaion: multiclient(sock, port, line)")
     while True:
+        if qq is True:
+            return True
+
         buff, addr = sock.recvfrom(4096)
         print("- - - - - -signal received on client side")
         buff = buff.decode()
@@ -127,8 +158,18 @@ def multiclient(sock, port, recv_list):
             print("- - - - - -REGISTRATION FINISHED sent to server")
         elif status == "ACK":
             print("this is where I will start texting.")
+        elif status == "SILENT_QUIT_LIST_UPDATE":
+            username = lines[1]
+            recv_list[username]["Status"] = "Offline"
+            del_ack = "QUIT_ACK\n{u}\n{i}\n{c}".format(u=username, i=ip, c=cport)
+            sock.sendto(del_ack.encode(), addr)
         else:
             print("unkown status. Currently working on")
+
+def silent_leave(recv, frame):
+    global qq
+    print("! ! !CTRL C pressed! ! !")
+    qq = True
 
 def list_create(list, name, ip, cport):
     print("@@@Location: list create")
@@ -158,6 +199,7 @@ def send_all_func(sock, encoded, list, clip, cport, sport, isServ, username):
         sock.sendto(encoded.encode(), (str(clip), int(sport)))
 
 if __name__ == "__main__":
+    signal.signal(signal.SIGINT, silent_leave)
     mode = sys.argv[1]
     if mode == '-s':
         sport = int(sys.argv[2])
