@@ -3,7 +3,6 @@ import threading
 import sys
 
 def server(port):
-
     print("\n. . .entering the server function. . .")
     server_list = {}
     sock = socket(AF_INET, SOCK_DGRAM)
@@ -12,32 +11,18 @@ def server(port):
     print("---server socket successfully bound---")
 
     while True:
-        print("\n. . .receiving from client. . .")
+        print("\n. . .receiving from client(s). . .")
         buff, caddr = sock.recvfrom(4096)
         buff = buff.decode()
-        buff = buff.splitlines()
+        list = buff.splitlines()
         print("client address: ", caddr)
         print("---successfully received message from client---")
         status = buff[0]
         #print("\n. . .THREAD ATTEMPT. . .")
-        print("\n. . .attempting registration (assuming not using multithread). . .")
-        if(status == "REGISTRATION"):
-            username = buff[1]
-            ip = buff[2]
-            cport = [3]
-            server_reg(sock, caddr[0], username, ip, port, cport, server_list)
-            print("registration attempt successfull")
-
-
-        '''count = 0
-        for i in buff:
-            print("         >>", count, "'th item in buff: ", i)
-            count += 1
-        print("---test successfully received---")
-        msg = "TEST_SUCCESS\nhi there"
-        cport = buff[3]
-        sock.sendto(msg.encode(), (str(caddr[0]), int(cport)))
-        print("---test successfully sent---")'''
+        print("\n. . .MULTITHREAD UTLIIZATION. . .")
+        smt = threading.Thread(target=multiserver, args=(sock, caddr[0], cport, list, server_list))
+        smt.start()
+        print("---successfully started multithreading for server---")
 
 def client(username, serverip, serverport, clientport):
     local_list = {}
@@ -46,42 +31,64 @@ def client(username, serverip, serverport, clientport):
     print("---socket sock has been created for client---")
     sock.bind(('',clientport))
     print("---client socket successfully bound---")
-
+    local_list = list_create(local_list, username, serverip, clientport)
     print("\n. . .beginning test. . .")
     print("Welcome, %s. Your port number is %d and are attempting to connect to the port %d" % (username, clientport, serverport))
     test = "REGISTRATION\n{u}\n{i}\n{c}".format(u = str(username), i = str(serverip), c = int(clientport))
     sock.sendto(test.encode(), (serverip, serverport))
     print("---message sent---")
+
+    print("\n.. .MULTITHREAD UTILIZATION FOR CURRENT SERVER. . . ")
+    cmt = threading.Thread(target=multiclient, args=(sock, cport, local_list))
+    cmt.start()
+
+def multiserver(sock, caddr, cport, recv_list, serv_list):
+    list = recv_list
+    status = list[0]
+
+
+    if status == "REGISTRATION":
+        print("\n. . .Beginning Registration process on server side. . .")
+        username = list[1]
+        ip = list[2]
+        cliport = list[3]
+        if username in serv_list:
+            if (serv_list[username]["Client Port"] == cliport):
+                print("===situation of a returning client===")
+                upd = "RETURNER\n{u}\n{i}".format(u=username, i=ip)
+                sock.sendall(upd.encode())
+            else:
+                print("===duplicate found===")
+                dup = "DUPLICATE\nA duplicate was found. Need to get rid of client"
+                sock.sendto(dup.encode(), (caddr, cliport))
+        else:
+            reg = "REGISTER\n{u}\n{i}\n{c}".format(u = username, i = ip, c = cliport)
+            sock.sendall(reg.encode())
+    else:
+        print("unknown status. Currently working on it.")
+
+def multiclient(sock, port, recv_list):
     while True:
-        buff, saddr = sock.recvfrom(4096)
-        print("server address: ", saddr)
+        buff, addr = sock.recvfrom(4096)
         buff = buff.decode()
-        buff = buff.splitlines()
-        count = 0
-        for i in buff:
-            print("         >>", count, "'th item in buff: ", i)
-            count += 1
-        print("---test successfully received---")
+        lines = buff.splitlines()
+        status = lines[0]
 
-def server_respond(sock, caddr, cport):
-    """
-    attempt to use this function when attempting to speak with multiple clients
-
-    ADDITIONAL NOTES:
-    - possibly consider making one for client, since they must speak with multiple clients and a server as well
-    """
-    pass
-def client_listen(sock, port):
-    """
-    attempt to use this function when listening to multiple clients and the server as well
-
-    ADDITIONAL NOTES:   
-    - consider making one for server since it has to listen to multiple clients as well
-        possibly what it means to "respond". it means it's listening to multiple, then answering to the specific out of many
-    """
-    pass
-
-
+        if status == "RETURNER":
+            username = lines[1]
+            ip = lines[2]
+            recv_list[username]["IP"] = ip
+            recv_list[username]["Status"] = "Online"
+        elif status == "DUPLICATE":
+            print("hard exiting. need to restart because you have taken a name that already exists")
+            sys.exit()
+        elif status == "REGISTER":
+            username = lines[1]
+            ip = lines[2]
+            cport = lines[3]
+            list_create(recv_list, ip, cport)
+        else:
+            print("unkown status. Currently working on")
 
 def server_reg(sock, caddr, name, ip, sport, cport, slist):
     print("\n. . .beginning client registration. . .")
@@ -99,6 +106,14 @@ def server_reg(sock, caddr, name, ip, sport, cport, slist):
         print("\n. . .creating ACK. . .")
         ack = "REGISTERED\n{n}\n{i}\n{c}".format(u = str(name), i = str(ip), c = int(cport))
         sock.sendall(ack.encode())
+
+def list_create(list, name, ip, cport):
+    list[name] = {}
+    list[name]["IP"] = ip
+    list[name]["Client Port"] = cport
+    list[name]["Status"] = "Online"
+    print("---table successfully updated---")
+    return list
 
 if __name__ == "__main__":
     mode = sys.argv[1]
