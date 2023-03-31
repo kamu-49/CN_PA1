@@ -1,264 +1,241 @@
 from socket import *
 import threading
 import sys
-import time
-
-"""
-test = "{s}\n{u}\n{i}\n{c}".format(s = "REGISTRATION", u = str(un), i = str(ip), c = int(cport))
-sock.sendto(test.encode(), (ip, sport))
-"""
+import signal
 
 qq = False
-BUF = 4096
-ai = AF_INET
-sd = SOCK_DGRAM
 
-def server(sport):
-    list = {}
-    s = socket(ai, sd)
-    s.bind(('',sport))
-    print(">>>Server online")
-
-    while True:
-        print("is this thing messing things up")
-        recv, addr = s.recvfrom(4096)
-        ip = addr[0]
-        cport = addr[1]
-        buff = recv.decode()
-        lines = buff.splitlines()
-        print("status: ", lines[0])
-        send = threading.Thread(target=server_respond,args=(s, ip, cport, list, lines))
-        send.start()
-        time.sleep(4)
-
-def server_respond(sock, ip, cport, list, lines):
-    status = lines[0]
-    un1 = lines[1]
-    ip1 = lines[2]
-    cport1 = lines[3]
-    if status == "REGISTRATION":
-        server_reg(sock, list, lines)
-
-
-def server_reg(s, list, lines):
-    status = lines[0]
-    un = lines[1]
-    ip = lines[2]
-    cport = lines[3]
-    print("status is ", status)
-    ack = "{s}\n{u}\n{i}\n{c}".format(s = "ACK", u = str(un), i = str(ip), c = int(cport))
-    s.sendto(ack.encode(), (str(ip), int(cport)))
-    print("ack has been sent")
-
-#################################################################
-
-def client(un, ip, sport, cport):
-    list = {}
-    s = socket(ai, sd)
-    s.bind(('',cport))
-    print(">>>client online")
-    test = "{s}\n{u}\n{i}\n{c}".format(s = "REGISTRATION", u = str(un), i = str(ip), c = int(cport))
-    s.sendto(test.encode(), (ip, sport))
-    print("first message sent")
-
-    listen = threading.Thread(target=client_listen, args=(s, cport, list))
-    listen.start()
-
-    time.sleep(3)
-    while True:
-        temp = input(">>>:")
-        print(temp, " IT WORKED")
-
-
-def client_listen(s, cport, list):
-    while True:
-        hold, addr = s.recvfrom(4096)
-        buf = hold.decode()
-        lines = buf.splitlines()
-
-        status = lines[0]
-        if status == "ACK":
-            print("ACK received on client end")
-
-
-
-def client_reg(sock, list, un, ip, sp, cp):
-
-    test = "{s}\n{u}\n{i}\n{c}".format(s = "REGISTRATION", u = str(un), i = str(ip), c = int(cport))
-    sock.sendto(test.encode(), (ip, sp))
-
-    reg, addr = sock.recvfrom(BUF)
-    buff = reg.decode()
-    lines = buff.splitlines()
-    status = lines[0]
-    un1 = lines[1]
-    ip1 = lines[2]
-    cport1 = lines[3]
-
-
-
-
-    if cport1 == cport: #means that they don't have to re-update
-        if status == "RET":
-            list[un]["IP"] = ip1
-            print(">>> [Welcome. You are registered]")
-
-
-        elif status == "DUP":
-            print("hard exiting. need to restart because you have taken a name that already exists")
-            sys.exit()
-
-
-        elif status == "REG":
-            list = lister(list, un1, ip1, cport1)
-            print(">>> [Welcome. You are registered]")
-
-
-    else:
-        if status == "RET":
-            list = lister(list, un1, ip1, cport1)
-
-
-        elif status == "DUP":
-            pass
-
-
-        elif status == "REG":
-            list = lister(list, un1, ip1, cport1)
-
-        print(">>> [Welcome. You are registered]")
-
-###################################################################
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-"""
-def lister(list, name, ip, port): #client port
-    print("LISTER TST: ", list, name, ip, port)
-    list[name] = {}
-    list[name]["IP"] = str(ip)
-    list[name]["Port"] = int(port)
-    list[name]["Status"] = "Online"
-
-def server(sport): #server port
-    list = {}
-    sock = socket(ai, sd)
-    sock.bind(('',sport))
-
-    while True:
-        reg, addr = sock.recvfrom(BUF)
-        buff = reg.decode()
-        lines = buff.splitlines()
-        reg = threading.Thread(target=server_reg, args=(sock, sport, lines, list))
-        reg.start()
-        reg.join()
-
-def client_reg(sock, list, un, ip, sp, cp):
-    
-    #sending...
-
-#    FRESH_REG
- #   tudbud
-  #  IP
-   # CPORT
-    
-
-    test = "{s}\n{u}\n{i}\n{c}".format(s = "REGISTRATION", u = str(un), i = str(ip), c = int(cport))
-    sock.sendto(test.encode(), (ip, sp))
-
-    reg, addr = sock.recvfrom(BUF)
-    buff = reg.decode()
-    lines = buff.splitlines()
-    status = lines[0]
-    un1 = lines[1]
-    print(un1, "gu ogg")
-    ip1 = lines[2]
-    cport1 = lines[3]
-    if cport1 == cport: #means that they don't have to re-update
-        if status == "RET":
-            list[un]["IP"] = ip1
-            print(">>> [Welcome. You are registered]")
-        elif status == "DUP":
-            print("hard exiting. need to restart because you have taken a name that already exists")
-            sys.exit()
-        elif status == "REG":
-            list = lister(list, un1, ip1, cport1)
-            print(">>> [Welcome. You are registered]")
-    else:
-        if status == "RET":
-            list = lister(list, un1, ip1, cport1)
-        elif status == "DUP":
-            pass
-        elif status == "REG":
-            list = lister(list, un1, ip1, cport1)
-
-        print(">>> [Welcome. You are registered]")
-
-def server_reg(sock, sport, lines, list):
-    status = lines[0]
-    un = lines[1]
-    ip = lines[2]
-    cport = lines[3]
-    if status == "REGISTRATION":
-            if un in list:
-                if(list[un]["Port"] == cport):
-                    list[un]["IP"] = ip
-                    upd =  "{s}\n{u}\n{i}\n{c}".format(s = "RET", u = str(un), i = str(ip), c = int(cport))
-                    for un in list:
-                        combo = (un["IP"], un["Port"])
-                        sock.sendto(upd.decode(), combo)
-                    print(">>> [Welcome. You are registered]")
-                else:
-                    dup = "{s}\n{u}\n{i}\n{c}".format(s = "DUP", u = str(un), i = str(ip), c = int(cport))
-                    print(">>> [Welcome. Username already taken. Please try again]")
-                    sock.sendto(dup.decode(), (ip, cport))
-            else:
-                list = lister(list, un, ip, cport)
-                reg = "{s}\n{u}\n{i}\n{c}".format(s = "REG", u = str(un), i = str(ip), c = int(cport))
-                send_all_func(sock, reg, list, ip, cport, sport, True, un)
-                print(">>> [Welcome. You are registered]")
-
-def client(un, ip, sport, cport):
-    quitter = False
-    list = {}
+def server(port):
+    server_list = {}
     sock = socket(AF_INET, SOCK_DGRAM)
-    sock.bind(('',cport))
-    local_list = lister(list, un, ip, cport)
-    print("LOCAL LIST TEST; ", un, ip, cport)
-    cmt = threading.Thread(target=client_reg, args=(sock, local_list, un, ip, sport, cport))
+    sock.bind(('',port))
+
+    while True:
+        buff, caddr = sock.recvfrom(4096)
+        buff = buff.decode()
+        list = buff.splitlines()
+        cport = caddr[1]
+        caddr = caddr[0]
+        status = buff[0]
+        smt = threading.Thread(target=multiserver, args=(sock, caddr, cport, sport, list, server_list))
+        smt.start()
+        smt.join()
+
+
+def client(username, serverip, serverport, clientport):
+    quitter = False
+    local_list = {}
+    sock = socket(AF_INET, SOCK_DGRAM)
+    sock.bind(('',clientport))
+    local_list = list_create(local_list, username, serverip, clientport)
+    print("Welcome, %s. Your port number is %d and are attempting to connect to the port %d\n" % (username, clientport, serverport))
+    test = "REGISTRATION\n{u}\n{i}\n{c}".format(u = str(username), i = str(serverip), c = int(clientport))
+    sock.sendto(test.encode(), (serverip, serverport))
+
+    cmt = threading.Thread(target=multiclient, args=(sock, int(cport), local_list))
+    talkative = threading.Thread(target=client_sendmsg,args=(sock, local_list, cport))
     cmt.start()
     cmt.join()
 
+    talkative.start()
+    q = talkative.join()
+    if q is True:
+        sq = "SILENT_QUIT\n{u}\n{i}\n{p}\n silent quit commence".format(u = str(username), i = str(serverip), p=int(clientport))
+        sock.sendto(sq.encode(), (serverip, serverport))
+        print("- - - - - -successfull silent quit test")
+    print("- - - - - -successfully started multiserver thread")
+    #talkative.start()
+    ##talkative.join()
+
     while True:
-        temp = input(">>>:: ")
-        print(temp)
+        inp = input(">>>")
+        
+
+def multiserver(sock, caddr, cport, sport, recv_list, serv_list):
+    line = recv_list
+    list = serv_list
+    status = line[0]
+
+    if status == "REGISTRATION":
+        username = line[1]
+        ip = line[2]
+        cliport = line[3]
+        if username in list:
+            if (list[username]["Client Port"] == cliport):
+                upd = "RETURNER\n{u}\n{i}".format(u=username, i=ip)
+                for un in list:
+                    combo = (un["IP"], un["Client Port"])
+                    sock.sendto(upd.decode(), combo)
+            else:
+                dup = "DUPLICATE\nA duplicate was found. Need to get rid of client"
+                sock.sendto(dup.encode(), (str(caddr), int(cliport)))
+        else:
+            reg = "REGISTER\n{u}\n{i}\n{c}".format(u = username, i = ip, c = cliport)
+            send_all_func(sock, reg, list, ip, cliport, sport, True, username)
+            list = list_create(list, username, ip, cliport)
+    elif status == "REGISTRATION_UPDATED" or status == "REGISTRATION_FINISHED":
+        pp = line[1]
+        user = line[2]
+        cliport = line[3]
+        ready = "ACK\nsend when you're ready"
+        send_all_func(sock, ready, list, pp, cliport, sport, True, user)
+    elif status == "SILENT_QUIT":
+        user = line[1]
+        ip = line[2]
+        port = line[3]
+        list[user]["Status"] = "Offline"
+        for u in list:
+            if list[u]["Status"] == "Online":
+                userr = u
+                ipp = list[u]["IP"]
+                portt = list[u]["Client Port"]
+                squit = "SILENT_QUIT_LIST_UPDATE\n{uz}\n{i}\n{p}\nA user has quit".format(uz=userr, i=ipp, p=portt)
+                sock.sendto(squit.encode(), (ipp, portt))
+    elif  status == "QUIT_ACK":
+        ready = "ACK\nsend when you're ready"
+        un = line[1]
+        ii = line[2]
+        ppp = line[3]
+        sock.sendto(ready.encode(), (ii, ppp))
+    else:
+        print("unknown status. Currently working on it.")
+
+def multiclient(sock, port, recv_list):
+    while True:
+        if qq is True:
+            return True
+
+        buff, addr = sock.recvfrom(4096)
+        buff = buff.decode()
+        lines = buff.splitlines()
+        status = lines[0]
+
+        if status == "RETURNER":
+            username = lines[1]
+            ip = lines[2]
+            recv_list[username]["IP"] = ip
+            recv_list[username]["Status"] = "Online"
+            ack = "REGISTRATION_UPDATED\n{i}\n{u}\n{c}Client updated registration and is ready".format(i=ip, u = username, c = port)
+            sock.sendto(ack.encode(), addr)
+        elif status == "DUPLICATE":
+            print("hard exiting. need to restart because you have taken a name that already exists")
+            sys.exit()
+        elif status == "REGISTER":
+            username = lines[1]
+            ip = lines[2]
+            cport = lines[3]
+            recv_list = list_create(recv_list, username, ip, cport)
+            ack = "REGISTRATION_FINISHED\n{i}\n{u}\n{c}\nClient finished registration and is ready".format(i = ip, u=username, c = cport)
+            sock.sendto(ack.encode(), addr)
+        elif status == "ACK":
+            return "finished"
+        elif status == "SILENT_QUIT_LIST_UPDATE":
+            username = lines[1]
+            recv_list[username]["Status"] = "Offline"
+            del_ack = "QUIT_ACK\n{u}\n{i}\n{c}".format(u=username, i=ip, c=cport)
+            sock.sendto(del_ack.encode(), addr)
+            #threading.Thread.exit()
+        elif status == "TEXT":
+            username = lines[1]
+            message = lines[2]
+            print(">>> %s: %s" % (username, message))
+            ack = "TEXT_ACK\n{u}\n{i}\n{c}".format(u=username, i=addr[0], c=addr[1])
+            sock.sendto(ack.encode(), addr)
+        else:
+            print("unkown status. Currently working on")
+
+def client_sendmsg(sock,list, cport):
+    #while True:
+    message = input(">>> ")
+    while True:
+        """
+        USER INPUT NOT WORKING FOR SOME REASON. CANNOT FIGURE OUT WHY
+        """
+        for u in list:
+            if list[u]["Client Port"] == cport:
+                tester_user = u
+        message="send {u} hello this is the test message".format(u = tester_user)
+        ot = message.split() #send, tudbud, test, message
+        """if len(ot) <= 2:
+            message = input("Incorrect length of words. Retry...\n>>>")"""
+        user = ot[1]
+        string = ' '.join(ot[x] for x in range(2, len(ot)))
+        chattee_ip = list[user]["IP"]
+        chattee_port = list[user]["Client Port"]
+        chattee = (chattee_ip, chattee_port)
+        msg = "TEXT\n{u}\n{m}".format(u=str(user), m=str(string))
+        sock.sendto(msg.encode(), chattee)
+
+        try:
+            ack, addr = sock.recvfrom(4096)
+            buff = ack.decode()
+            lines = buff.splitlines()
+            status = lines[0]
+            if status == "TEXT_ACK":
+                print(">>> [Messge received by %s]" % user)
+
+        except socket.Timeouterror:
+            print(">>> [No ACK from %s,message not delivered]." % user)
+
+def client_groupchat(sock, list, cport, ip, sport):
+    alreadyGroup = False
+    #USER INPUT NTO WORKING. CONFIGURING TEST INSTANCES...
+    test_group = "the fantastics"
+    """
+    message = input(">>>")
+    gc = message.split()
+    if len(gc) < 2:
+        gc = input("incorrect length. please try again")
+    else:
+        fullname = ' '.join(gc[i] for i in range(1, len(gc)))
+        chat_create = "CHAT_CREATE\n{gc}".format(gc = fullname)
+        sock.sendto(chat_create.encode(), (ip, sport))
+    """
+    for u in list:
+        if list[u]["Client Port"] == cport:
+            tester_user = u
+            if list[u]["Mode"] == "Group":
+                alreadyGroup = True
+    
+    if alreadyGroup:
+        print("you'rea already a part of a group. Sorry")
+        return
+    else:
+        message = "create_group {d}".format(d = test_group)
+        fin_message = ">>> {m}".format(m = message)
+        gc = message.split()
+        if len(gc) < 2:
+            retry = input(">>>tha tis an incorrect size. Please try again")
+        else:
+        
+
+def silent_leave(recv, frame):
+    global qq
+    print("! ! !CTRL C pressed! ! !")
+    qq = True
+
+def list_create(list, name, ip, cport):
+    list[name] = {}
+    list[name]["IP"] = str(ip)
+    list[name]["Client Port"] = int(cport)
+    list[name]["Status"] = "Online"
+    return list
 
 def send_all_func(sock, encoded, list, clip, cport, sport, isServ, username):
     if isServ:
-        if list:
-            if len(list) > 1:
-                for un in list:
-                    if list[un] != username:
-                        sock.sendto(encoded.encode(), combo)
+        if len(list) > 1:
+            for un in list:
+                if list[un] != username:
+                    combo = (list[un]["IP"], list[un]["Client Port"])
+                    sock.sendto(encoded.encode(), combo)
         else:
                 combo = (str(clip), int(cport))
                 sock.sendto(encoded.encode(), combo)
     else:
         sock.sendto(encoded.encode(), (str(clip), int(sport)))
-"""
+
 if __name__ == "__main__":
-    #signal.signal(signal.SIGINT, silent_leave)
+    signal.signal(signal.SIGINT, silent_leave)
     mode = sys.argv[1]
     if mode == '-s':
         sport = int(sys.argv[2])
@@ -268,8 +245,6 @@ if __name__ == "__main__":
         ip = str(sys.argv[3])
         sport = int(sys.argv[4])
         cport = int(sys.argv[5])
-        print("starting cli")
         client(name, ip, sport, cport)
     else:
         print("invalid")
-        
