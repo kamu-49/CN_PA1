@@ -1,37 +1,61 @@
-from socket import *
-import threading
-import sys
-import signal
+from socket import * #for socket programming
+import threading #for multithreading for multiple clients
+import sys #for exit calls and input calls
+import time #for sleep
+import signal #for silent quit
 
-qq = False
+qq = False # for the quit function
 
+
+
+
+"""
+SERVER FUNCTION:
+Parameters: server port
+In this function it is the heart of the server functionality.
+1. socket was created and bound to sport
+2. loop created to search for receiving signals with multithreading
+"""
 def server(port):
+    #creating server list to hold all info, and declare/bind socket
     server_list = {}
     sock = socket(AF_INET, SOCK_DGRAM)
     sock.bind(('',port))
 
-    while True:
+    while True: #while loop that looks for signals
         buff, caddr = sock.recvfrom(4096)
         buff = buff.decode()
         list = buff.splitlines()
         cport = caddr[1]
         caddr = caddr[0]
         status = buff[0]
+        #multiserver thread. see below
         smt = threading.Thread(target=multiserver, args=(sock, caddr, cport, sport, list, server_list))
         smt.start()
         smt.join()
 
-
+"""
+CLIENT FUNCTION:
+Parameters: username, server ip, server port, client port
+This function is the heart fo the server functionality
+1. local list created along with implementation/binding of socket
+2. list create called to hlep create local list
+3. print test
+4. registration signal created
+5.multithreadcreate for sending messages
+6. quitting also utilized in here
+"""
 def client(username, serverip, serverport, clientport):
-    quitter = False
-    local_list = {}
-    sock = socket(AF_INET, SOCK_DGRAM)
+    quitter = False #boolean for silent quit
+    local_list = {} #local list for info
+    sock = socket(AF_INET, SOCK_DGRAM) #sock decl
     sock.bind(('',clientport))
-    local_list = list_create(local_list, username, serverip, clientport)
-    print("Welcome, %s. Your port number is %d and are attempting to connect to the port %d\n" % (username, clientport, serverport))
-    test = "REGISTRATION\n{u}\n{i}\n{c}".format(u = str(username), i = str(serverip), c = int(clientport))
-    sock.sendto(test.encode(), (serverip, serverport))
+    local_list = list_create(local_list, username, serverip, clientport) #creation of local list
+    print("Welcome, %s. Your port number is %d and are attempting to connect to the port %d\n" % (username, clientport, serverport)) #test print
+    test = "REGISTRATION\n{u}\n{i}\n{c}".format(u = str(username), i = str(serverip), c = int(clientport)) #registration signal sent to server
+    sock.sendto(test.encode(), (serverip, serverport)) # sent
 
+    #threads created for multithread client and message sending
     cmt = threading.Thread(target=multiclient, args=(sock, int(cport), local_list))
     talkative = threading.Thread(target=client_sendmsg,args=(sock, local_list, cport))
     cmt.start()
@@ -39,6 +63,8 @@ def client(username, serverip, serverport, clientport):
 
     talkative.start()
     q = talkative.join()
+    #mini function used for silent quitting
+    #attempted to utilize the global q in order to utilize silent quit
     if q is True:
         sq = "SILENT_QUIT\n{u}\n{i}\n{p}\n silent quit commence".format(u = str(username), i = str(serverip), p=int(clientport))
         sock.sendto(sq.encode(), (serverip, serverport))
@@ -47,38 +73,51 @@ def client(username, serverip, serverport, clientport):
     #talkative.start()
     ##talkative.join()
 
+    #probably the sorriest attempt I had towards user input out of the five other files
     while True:
         inp = input(">>>")
         
-
+"""
+MULTISERVER FUNCTION:
+Parameters: socket, client ip, client port, server port, line(from recv), server list
+This is used for multiple uses of server within the clients
+"""
 def multiserver(sock, caddr, cport, sport, recv_list, serv_list):
     line = recv_list
     list = serv_list
     status = line[0]
-
+    #test for registration signal from clients.
+    #if get registration, tests to see if the username is in the list. If it is, it sees if it's a veteran client
+    #if a veteran client then we just change the IP
+    #if not a veteran then we signal for a duplicate
+    #otherwise it is a virgin client, so we go through the whole process
     if status == "REGISTRATION":
         username = line[1]
         ip = line[2]
         cliport = line[3]
-        if username in list:
-            if (list[username]["Client Port"] == cliport):
+        if username in list: #veteran client pt1
+            if (list[username]["Client Port"] == cliport): #veteran client pt2
                 upd = "RETURNER\n{u}\n{i}".format(u=username, i=ip)
                 for un in list:
                     combo = (un["IP"], un["Client Port"])
                     sock.sendto(upd.decode(), combo)
-            else:
+            else:#duplicate client. sends dup signal
                 dup = "DUPLICATE\nA duplicate was found. Need to get rid of client"
                 sock.sendto(dup.encode(), (str(caddr), int(cliport)))
-        else:
+        else:# virgin client. new client so it goes through the whole process and uses list create
             reg = "REGISTER\n{u}\n{i}\n{c}".format(u = username, i = ip, c = cliport)
             send_all_func(sock, reg, list, ip, cliport, sport, True, username)
             list = list_create(list, username, ip, cliport)
+    #testing for registration update. This was one of those unnecessary responses to an a status signal from the server.
+    #other files has this reduced
+    #if the registration successfully registers or finishes then the ack is sent to the client
     elif status == "REGISTRATION_UPDATED" or status == "REGISTRATION_FINISHED":
         pp = line[1]
         user = line[2]
         cliport = line[3]
         ready = "ACK\nsend when you're ready"
         send_all_func(sock, ready, list, pp, cliport, sport, True, user)
+    #silent quit attepmt. if receive a silent quit signa from client, then the process starts adn the client is marked as offline
     elif status == "SILENT_QUIT":
         user = line[1]
         ip = line[2]
@@ -100,11 +139,18 @@ def multiserver(sock, caddr, cport, sport, recv_list, serv_list):
     else:
         print("unknown status. Currently working on it.")
 
+
+"""
+MULTICLIENT FUNCTION:
+Parameters: sock, client port, lines(from recv)
+This is used for the multiple thread s for the clients for the multiple clients and the multiple usages of multiple
+clients in the server as well
+"""
 def multiclient(sock, port, recv_list):
     while True:
+        #test for silentquit
         if qq is True:
             return True
-
         buff, addr = sock.recvfrom(4096)
         buff = buff.decode()
         lines = buff.splitlines()
@@ -207,7 +253,7 @@ def client_groupchat(sock, list, cport, ip, sport):
         if len(gc) < 2:
             retry = input(">>>tha tis an incorrect size. Please try again")
         else:
-        
+            pass
 
 def silent_leave(recv, frame):
     global qq

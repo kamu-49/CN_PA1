@@ -11,6 +11,8 @@ CLIENT: python3 chatapp.py -c -username- -IP_addr- -sport- -cport-
  Documentation Information:
  I have simply used the chatapp python file. I was unfortuantely no where close to finishing this homework, which is what I would like to talk to the professor about, which I will talk about in a little bit. There is a "attempts" folder in here as well. I worked really really hard on this and I feel like it's only appreciated (by me) if I were to keep it in the folder, but it is not at all necessary to look at. It's mainly just to make me feel like I didn't give up on this hw.
 
+ About HALF of my Rfile is not commented. That is because of the constant crashe and Google Cloud disconnection I suffered from.Will talk to profesor abou ttha t
+
 
  Program Features:
  Although incomplete, my program utilized a few features, such as time.sleep in order to slow down the ACK signal. I utilzie test cases as well that help prevent special cases from happening, such as maybe the user input is too small for information to be gathered properly.
